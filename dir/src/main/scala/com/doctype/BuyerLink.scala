@@ -20,6 +20,7 @@ object BuyerLink {
 
 }
 /* NOTE: use url as ID! */
+/* wtf does "warning: a pure expression does nothing in statement position" mean in regards to below...*/
 case class BuyerLink(_id: ObjectId
 						, name: String
 						, url: String
@@ -27,6 +28,8 @@ case class BuyerLink(_id: ObjectId
             , secondaryAlbumURL: String
             , rawLocation: String
             , parsedLocation: String
+            , numActualPurchase: Int
+            , numScrapedPurchase: Int  
 					  , dateAccessed : Date) extends BandCampPage(_id, url, rawLocation, parsedLocation)
 {
 

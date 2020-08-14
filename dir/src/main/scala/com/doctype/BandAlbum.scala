@@ -19,6 +19,7 @@ object BandAlbum {
 
 }
 /* NOTE: use url as ID! */
+/* wtf does "warning: a pure expression does nothing in statement position" mean in regards to below...*/
 case class BandAlbum(_id: String
 						, artist: String
 						, album: String

@@ -5,7 +5,8 @@ package com.mongoscala
 
 /* document type */
 
-import seleniumTool._;
+import seleniumTool._
+import lib.mongoUtil._
 
 import java.time._
 
@@ -35,9 +36,25 @@ object App {
     
     var testURL : String = "https://bandcamp.com/sometimesgreg";
 
-    var purchaseURLs : List[String] = creeper.scrapeBuyerPurchases( testURL )
+    //creeper.expandBuyerPurchases( testURL )
     println("size of buyers curr process: " + purchaseURLs)
-    creeper.testPull()
+    //creeper.testPull()
+
+    /*
+    ( artist: String
+                , album: String
+                , url: String
+                , rawLocation: String
+                , parsedLocation: String
+                , parent: String
+                , numBuyers: Int)*/
+
+    val db : MongoTool = new MongoTool("test")
+
+    val testL : List[BandAlbum] = List( BandAlbum("Alex G", "Race", "www...", "Philly", "", "", 500)
+                                        , BandAlbum("Alex G", "House", "www...H", "Philly", "", "", 500) )
+
+    db.insertList( testL )
     /*
     println("Website is: " + websiteURL);
     

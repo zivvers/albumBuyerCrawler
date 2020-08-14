@@ -30,18 +30,6 @@ import java.io.File;
 import java.util.concurrent.TimeUnit
 import org.apache.commons.io.FileUtils;
 
-import org.mongodb.scala.MongoClient
-import org.mongodb.scala.MongoDatabase;
-import org.mongodb.scala.MongoCollection;
-import org.mongodb.scala.Observer
-import org.mongodb.scala.Subscription
-import org.mongodb.scala.Completed
-
-
-import org.mongodb.scala.bson.codecs.Macros._
-import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
-import org.bson.codecs.configuration.CodecRegistries.{fromRegistries, fromProviders}
-
 /* for error:  Cannot find an implicit ExecutionContext */
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -59,19 +47,7 @@ import doctype._;
 class BandCampCrawler(baseURL : String) extends Crawler() {
 
 
-   driver.get( baseURL );
-   
-   println("navigating to website ... ")
-   
-
-
-   private val codecRegistry = fromRegistries(fromProviders(classOf[BandAlbum], classOf[BuyerLink]), DEFAULT_CODEC_REGISTRY );
-
-   private val uri = "mongodb://db:27017";
-                     /// mongodb://mongo:27017
-   private val client : MongoClient = MongoClient( "mongodb://db:27017" );
-
-   private val db: MongoDatabase = client.getDatabase("test").withCodecRegistry(codecRegistry);
+  driver.get( baseURL );
 
    //waitForLoad.until(
    //   ExpectedConditions.elementToBeClickable( By.className("playbutton") ) // should be on all bandcamp pages
@@ -116,23 +92,7 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
       *
       */
       
-      val collection: MongoCollection[BandAlbum] = db.getCollection("test");
 
-      collection.insertOne(testEntry).subscribe(
-          new Observer[Completed](){
-            override def onSubscribe(subscription: Subscription): Unit = {
-
-              println("doc successfully inserted")
-
-            }
-
-            override def onNext(result: Completed): Unit = println("inserted!");
-
-            override def onError(e: Throwable): Unit = println(s"Error: $e")
-
-            override def onComplete(): Unit = println("Completed")
-          }
-      );
 
    }
 
@@ -199,8 +159,9 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
    // this a method to scrape a buyer page of all the links 
    // we must use selenium due to "view all <#> items" that we
    // want to expand
-   // PostC: returns List of unique URLs that represent albums or songs
-   def scrapeBuyerPurchases(buyerURL : String /* e.g. https://bandcamp.com/jacobcarl */) : List[String] =
+   // precondition(s): none - driver navigates
+   // postcondition(s): returns List of unique URLs that represent albums or songs
+   def expandBuyerPurchases(buyerURL : String /* e.g. https://bandcamp.com/jacobcarl */) : Unit =
    {
 
      driver.get(buyerURL) // example
@@ -214,33 +175,19 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
      
      var linkList : List[String] = List[String]() //driver.findElements(By.cssSelector("div.collection-title-details")).asScala.toList;
 
-     println("number of purchase results is: " + linkList.size)
 
-     // declare empty set
-     var linkSet = scala.collection.mutable.Set[String]();
-     //var prevSize : Int = 0;
-     //var cont : Boolean = true;
-     //var firstID : String = "";
-
-     /* wow ok see below for how to instantiate null */
-     
-     var purchaseElems : List[WebElement] = Nil
+     var purchaseElems : List[WebElement] = Nil //can't do below b/c WebElement is abstract class
      var lastSizeList : ListBuffer[Int] = new ListBuffer[Int]()
-     // null.asInstanceOf[WebElement] //new WebElement()//driver.findElement(By.cssSelector("div.collection-title-details")) ;
     
       while( ( lastSizeList.size < 3 
-             || ! lastSizeList.takeRight(3).forall( _ == lastSizeList.last ) ) && linkSet.size < totResults )
+             || ! lastSizeList.takeRight(3).forall( _ == lastSizeList.last ) ) && linkList.size < totResults )
       {
 
         linkList = driver.findElements(By.cssSelector("div.collection-title-details")).asScala.toList
                           .map( x => x.findElement(By.cssSelector("a.item-link")).getAttribute("href") )
-        
-        linkSet ++= linkList
 
-        lastSizeList += linkSet.size
-        // firstID = driver.findElement()
+        lastSizeList += linkList.size
 
-        println("number of total purchase results is: " + linkSet.size)
         println("number of curr visible purchase results is: " + linkList.size)
         // go to bottom of page        
         driver.findElement(By.cssSelector("body")).sendKeys(Keys.CONTROL, Keys.END);
@@ -261,7 +208,6 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
 
       }
 
-      return linkSet.toList
     
   }
    
@@ -277,7 +223,7 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
 
    // this is a method to expand the buyers list of an album (by clicking "more...")
    // precondition(s): driver MUST be on loaded band page
-   // postcondition(s): driver has all buyers loaded, or at least all that can be loaded :( 
+   // postcondition(s): driver has all buyers loaded, or at least all that can be loaded 
    def expandBuyers() 
    {
 
