@@ -30,6 +30,8 @@ import java.io.File;
 import java.util.concurrent.TimeUnit
 import org.apache.commons.io.FileUtils;
 
+import org.mongodb.scala.MongoCollection;
+
 /* for error:  Cannot find an implicit ExecutionContext */
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -77,7 +79,7 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
    def testUpload()
    {
       
-      val testEntry : BandAlbum = BandAlbum("Alex G", "Race", "www", "Philly", "", "");
+      // val testEntry : BandAlbum = BandAlbum("Alex G", "Race", "www", "Philly", "", "");
 
       /*
       * ( artist: String
@@ -99,7 +101,7 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
    def printFirst()
    {
 
-      val collection: MongoCollection[BandAlbum] = db.getCollection("test");
+      //val collection: MongoCollection[BandAlbum] = db.getCollection("test");
 
       println("get doc...");
       //val res = collection.find().first().toFuture().foreach(record => record.print() );
@@ -112,7 +114,7 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
 
       //collection.find().collect().subscribe((results: Seq[BandAlbum]) => println(s"Found: #${results.size}") )
 
-      val res = collection.find().first();
+      //val res = collection.find().first();
       /*
       collection.find().first().subscribe(
           //(doc: org.mongodb.scala.bson.Document) => {
@@ -129,9 +131,9 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
           }
       )
       */
-      val resAwait = Await.result(res.toFuture, Duration(10, TimeUnit.SECONDS)).asInstanceOf[BandAlbum]
+      //val resAwait = Await.result(res.toFuture, Duration(10, TimeUnit.SECONDS)).asInstanceOf[BandAlbum]
 
-      resAwait.print()
+      //resAwait.print()
 
 
    }
@@ -155,13 +157,73 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
 
    }
 
+   // expand expandBuyerPurchases
+   // get basic info
+   // get # supposed purchases 
+   // get all buys
+
+   def updateBuyerDeets( buyerURL : String, primaryAlbumURL : String, picURL : String) : List[BuyerLink] =
+   {
+
+    val supposedPurchases : Int = expandBuyerPurchases( buyerURL )
+
+    val linkList = driver.findElements(By.cssSelector("div.collection-title-details")).asScala.toList
+                          .map( x => x.findElement(By.cssSelector("a.item-link")).getAttribute("href") )
+
+    //println( linkList )
+
+    val name = driver.findElement(By.cssSelector("div.name span")).getText
+ 
+
+    // we're assuming list item #1 in <div class="info"> <li> </li> <li> </li> </div>
+    // is the location and #2 is genre...
+    //println("# list elements: " + driver.findElements(By.cssSelector("div.info li")).asScala.toList.map( elem => elem.getText ).size)
+    //val Array( location : String , genre : String ) = driver.findElements(By.cssSelector("div.info li")).asScala.toArray.map( elem => elem.getText )
+    val infoArr : List[String] = driver.findElements(By.cssSelector("div.info li")).asScala.toList.map( elem => elem.getText )
+
+    val location = if (infoArr.size < 2) "" else infoArr(0)
+    val genre = if (infoArr.size < 2) infoArr(0) else infoArr(1)
+
+    //println("LOCATION: " + location  )
+    //println("GENRE: " + genre )
+    println("total # purchases: " + linkList.size)
+    println("supposed # purchases: " + supposedPurchases)
+    println("for buyer: " + buyerURL)
+
+    /* name: String
+          , url: String
+          , primaryAlbumURL: String
+          , secondaryAlbumURL: String
+          , rawLocation: String
+          , parsedLocation: String
+          , numActualPurchase : Int
+          , numScrapedPurchase : Int */
+    
+
+    // revise fields in Buyer object
+    /*val buyers : List[Buyer] = linkList.map( link => Buyer(name
+                                                                              , buyerURL
+                                                                              , primaryAlbumURL
+                                                                              , link
+                                                                              , location
+                                                                              , "" 
+                                                                              , linkList.size
+                                                                              , supposedPurchases
+                                                                              , picURL
+                                                                              , true  )  ) */
+
+    return Nil : List[BuyerLink]
+    //return buyers
+
+   }
+
 
    // this a method to scrape a buyer page of all the links 
    // we must use selenium due to "view all <#> items" that we
    // want to expand
-   // precondition(s): none - driver navigates
+   // precondition(s): none - driver navigates to buyer page :-) hooray side effects
    // postcondition(s): returns List of unique URLs that represent albums or songs
-   def expandBuyerPurchases(buyerURL : String /* e.g. https://bandcamp.com/jacobcarl */) : Unit =
+   private def expandBuyerPurchases(buyerURL : String /* e.g. https://bandcamp.com/jacobcarl */) : Int =
    {
 
      driver.get(buyerURL) // example
@@ -208,6 +270,7 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
 
       }
 
+      return totResults 
     
   }
    
@@ -224,17 +287,18 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
    // this is a method to expand the buyers list of an album (by clicking "more...")
    // precondition(s): driver MUST be on loaded band page
    // postcondition(s): driver has all buyers loaded, or at least all that can be loaded 
-   def expandBuyers() 
+   //                   returns tuples of the buyer page URLs & image URLs!
+   def expandBuyers( maxBuyers : Int ) : List[(String, String)] =
    {
 
     var numBuyers : Int = 0;
     var buyerList = List[WebElement]();
-
+    //var buyerURLs : List[String] = Nil;
     breakable {
 
 
       // maxes out at 3000 buyers for testing sake
-      while( driver.findElements(By.cssSelector("a.more-thumbs")).asScala.toList.size > 0 && numBuyers < 3000 )
+      while( driver.findElements(By.cssSelector("a.more-thumbs")).asScala.toList.size > 0 && numBuyers < maxBuyers )
       {
         // get all buyer elements
         buyerList = driver.findElements(By.cssSelector("a.fan.pic")).asScala.toList;
@@ -246,10 +310,14 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
         driver.asInstanceOf[JavascriptExecutor].executeScript("arguments[0].scrollIntoView(true);", elem);
 
         //driver.findElement(By.cssSelector("a.more-thumbs"))
+        
+        /* below is USEFUL code for taking screenshots
+
         val augmentedDriver = new Augmenter().augment(driver);
         val filed: File = driver.getScreenshotAs(OutputType.FILE);
         println("taking screenshot")
         FileUtils.copyFile(filed, new File("/usr/src/app/MongoScala/screenshots/bandcamp_2.jpg"))
+        */ 
 
         try {
 
@@ -271,29 +339,18 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
         // need to add ExpectedConditions.visibilityOfElementLocated !
         
         elem.click();
-        /*
-        breakable {
-          while( true )
-          {
-            if ( driver.findElements(By.cssSelector("a.fan.pic")).asScala.toList.size > numBuyers )
-            {
-
-              println( s"number of buyers: ${ driver.findElements( By.cssSelector("a.fan.pic") ).asScala.toList.size }" );
-              break;
-            
-            }
-
-          }
-        } */
+        
       }
-
-      val buyerURLs = buyerList.map(x => x.getAttribute("href"));
-
-      println(buyerURLs.take(10));
-
+      
 
     }
+      //List[(String, String)]
+      val buyerURLs : List[(String, String)] = buyerList.map(x => (x.getAttribute("href"), x.findElement(By.cssSelector("img.thumb")).getAttribute("src")) );
 
+      //println(buyerURLs.take(10));
+
+      return buyerURLs;
+    
 
    }
 
@@ -324,9 +381,11 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
    }
 
 
-   def getAlbumDeets( albumURL : String ) : Map[String,String] = 
+   def getAlbumDeets( albumURL : String ) : BandAlbum = 
    //def getAlbumDeets()
    {
+
+    assert( albumURL == driver.getCurrentUrl() )
 
     val albumTitle : String = driver.findElement(By.cssSelector("#name-section .trackTitle")).getAttribute("innerText").trim()
     val artist : String = driver.findElement(By.cssSelector("#name-section a")).getAttribute("innerText").trim()
@@ -337,13 +396,21 @@ class BandCampCrawler(baseURL : String) extends Crawler() {
     println(s"album title: $albumTitle ") 
     println(s"artist name: $artist ")
 
-
+    /*
     val albumDeetMap = Map( "title" -> albumTitle
                            ,"artist" -> artist
                            ,"location" -> location)
 
     albumDeetMap
+    */
 
+    return BandAlbum( albumURL
+          , artist
+          , albumTitle
+          , location
+          , ""
+          , ""
+          , false) 
 
    }
 

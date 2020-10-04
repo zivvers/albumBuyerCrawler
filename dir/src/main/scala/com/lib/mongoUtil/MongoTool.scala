@@ -11,59 +11,67 @@ import org.mongodb.scala.bson.codecs.Macros._
 import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
 import org.bson.codecs.configuration.CodecRegistries.{fromRegistries, fromProviders}
 
+import scala.concurrent.{Promise, Await}
+import scala.util.{Failure, Success}
+import scala.concurrent.duration.Duration
+
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import doctype._;
 
 class MongoTool(dataB: String) {
 
-   private val codecRegistry = fromRegistries(fromProviders(classOf[BandAlbum], classOf[BuyerLink]), DEFAULT_CODEC_REGISTRY );
+   private val codecRegistry = fromRegistries(fromProviders( classOf[BandCampPage] ), DEFAULT_CODEC_REGISTRY );
 
    private val uri : String = "mongodb://db:27017"
                      
    private val client : MongoClient = MongoClient( uri );
 
-   private val db: MongoDatabase = client.getDatabase( dataB ).withCodecRegistry(codecRegistry);
+   private val db: MongoDatabase = client.getDatabase( "test" ).withCodecRegistry(codecRegistry);
+
+   
 
 
-   def insertList( docList : List[BandCampPage]) : Unit =
+   /*
+   def listDB() = {
+
+
+    return client.listDatabaseNames()
+
+
+   }
+   */
+
+   def insertList( docList : List[BandCampPage], collName : String) : Unit =
    {
 
-      collection.insertMany( docList ).subscribe(
-          new Observer[Completed](){
 
-          	var successInsertion : Int = 0
+      val collection: MongoCollection[BandCampPage] = db.getCollection( collName );
+      
+      val insertFuture = collection.insertMany( docList ).toFuture().andThen {
+            /* side effects indicating success/failure 
+               need to convert to logging at some point */
+            case Success(successMsg) => println("successful insertion")
+            case Failure(failureMsg) => print("insertion error: {}", failureMsg)
+      }
 
-            override def onSubscribe(subscription: Subscription): Unit = {
+      Await.result(insertFuture, Duration(5, "seconds")) // let
 
-              println("doc successfully inserted")
-
-            }
-
-            override def onNext(result: Completed): Unit = { successInsertion++ };
-
-            override def onError(e: Throwable): Unit = println(s"Error: $e")
-
-            override def onComplete(): Unit = println("Successfully inserted " + successInsertion + docs)
-          }
-      );
-
-      /*
-          data
-      .grouped(1000)
-      .foreach(docs => {
-        val observable =
-          collection.insertMany(docs.map(str => Document(BsonDocument(str))))
-        Await.result(observable.head(), 10 seconds)
-      })
-	  */
+      
 
    }
 
+   def closeConnection() : Unit = {
 
+    client.close()
+
+   }
 
 
    def getDocCount() : Int =
    {
 
-
+    1
 
 
    }

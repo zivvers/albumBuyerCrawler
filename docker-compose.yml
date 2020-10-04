@@ -9,6 +9,7 @@ remote-webdriver:
 
 worker:
   build: .
+  container_name: mvn_workr
   links:
     - remote-webdriver
     - db
@@ -19,6 +20,15 @@ worker:
   stdin_open: true
   tty: true
   entrypoint: /bin/sh
+
+#pyshit:
+#  build: py/
+#  links:
+#    - remote-webdriver
+#    - db
+#  stdin_open: true
+#  tty: true
+#  entrypoint: /bin/sh
 
 db:
    image: mongo:4.2
